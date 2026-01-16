@@ -6,109 +6,128 @@ import {
   pointFeatures,
   polygonFeatures,
 } from "./schema.js";
+import { meshCode250 } from "../utils/jisMesh.js";
+import type { LineString, Point, Polygon } from "geojson";
 
 async function seed() {
-  await db
-    .insert(meshIndex)
-    .values([
-      {
-        meshId: "M-0001",
-        hasPoints: true,
-        hasLines: true,
-        hasPolygons: true,
-      },
-      {
-        meshId: "M-0002",
-        hasPoints: true,
-        hasLines: false,
-        hasPolygons: true,
-      },
-      {
-        meshId: "M-0003",
-        hasPoints: false,
-        hasLines: true,
-        hasPolygons: false,
-      },
+  const pointSamples = [
+    {
+      coordinates: [139.767, 35.681] as [number, number],
+      properties: { name: "Tokyo Station", category: "poi" },
+    },
+    {
+      coordinates: [139.703, 35.69] as [number, number],
+      properties: { name: "Shinjuku Sensor", category: "iot" },
+    },
+    {
+      coordinates: [139.701, 35.659] as [number, number],
+      properties: { name: "Shibuya Node", category: "mobility" },
+    },
+  ];
+
+  const points = pointSamples.map((sample) => {
+    const [lon, lat] = sample.coordinates;
+    return {
+      meshId: meshCode250(lat, lon),
+      geometry: {
+        type: "Point",
+        coordinates: sample.coordinates,
+      } as Point,
+      properties: sample.properties,
+    };
+  });
+
+  const lineSamples = [
+    {
+      coordinates: [
+        [139.759, 35.678],
+        [139.771, 35.688],
+      ] as [number, number][],
+      properties: { name: "Central Corridor", status: "active" },
+      center: [139.765, 35.683] as [number, number],
+    },
+    {
+      coordinates: [
+        [139.696, 35.665],
+        [139.707, 35.674],
+      ] as [number, number][],
+      properties: { name: "Yamanote Link", status: "planned" },
+      center: [139.7015, 35.6695] as [number, number],
+    },
+  ];
+
+  const lines = lineSamples.map((sample) => {
+    const [lon, lat] = sample.center;
+    return {
+      meshId: meshCode250(lat, lon),
+      geometry: {
+        type: "LineString",
+        coordinates: sample.coordinates,
+      } as LineString,
+      properties: sample.properties,
+    };
+  });
+
+  const polygonSamples = [
+    {
+      coordinates: [
+        [
+          [139.762, 35.677],
+          [139.768, 35.677],
+          [139.768, 35.683],
+          [139.762, 35.683],
+          [139.762, 35.677],
+        ],
+      ] as [number, number][][],
+      properties: { name: "Chiyoda Zone", coverage: "mixed-use" },
+      center: [139.765, 35.68] as [number, number],
+    },
+    {
+      coordinates: [
+        [
+          [139.698, 35.657],
+          [139.704, 35.657],
+          [139.704, 35.663],
+          [139.698, 35.663],
+          [139.698, 35.657],
+        ],
+      ] as [number, number][][],
+      properties: { name: "Shibuya Green", coverage: "park" },
+      center: [139.701, 35.66] as [number, number],
+    },
+  ];
+
+  const polygons = polygonSamples.map((sample) => {
+    const [lon, lat] = sample.center;
+    return {
+      meshId: meshCode250(lat, lon),
+      geometry: {
+        type: "Polygon",
+        coordinates: sample.coordinates,
+      } as Polygon,
+      properties: sample.properties,
+    };
+  });
+
+  const meshIds = Array.from(
+    new Set([
+      ...points.map((row) => row.meshId),
+      ...lines.map((row) => row.meshId),
+      ...polygons.map((row) => row.meshId),
     ])
-    .onConflictDoNothing();
+  );
 
-  await db.insert(pointFeatures).values([
-    {
-      meshId: "M-0001",
-      geometry: { type: "Point", coordinates: [-122.45, 37.761] },
-      properties: { name: "Cafe Orbit", category: "poi" },
-    },
-    {
-      meshId: "M-0001",
-      geometry: { type: "Point", coordinates: [-122.447, 37.758] },
-      properties: { name: "Sensor Alpha", category: "iot" },
-    },
-    {
-      meshId: "M-0002",
-      geometry: { type: "Point", coordinates: [-122.438, 37.764] },
-      properties: { name: "Transit Stop", category: "mobility" },
-    },
-  ]);
+  const meshIndexRows = meshIds.map((meshId) => ({
+    meshId,
+    hasPoints: points.some((row) => row.meshId === meshId),
+    hasLines: lines.some((row) => row.meshId === meshId),
+    hasPolygons: polygons.some((row) => row.meshId === meshId),
+  }));
 
-  await db.insert(lineFeatures).values([
-    {
-      meshId: "M-0001",
-      geometry: {
-        type: "LineString",
-        coordinates: [
-          [-122.451, 37.759],
-          [-122.446, 37.763],
-        ],
-      },
-      properties: { name: "Bike Corridor", status: "active" },
-    },
-    {
-      meshId: "M-0003",
-      geometry: {
-        type: "LineString",
-        coordinates: [
-          [-122.455, 37.768],
-          [-122.448, 37.772],
-        ],
-      },
-      properties: { name: "Utility Line", status: "planned" },
-    },
-  ]);
-
-  await db.insert(polygonFeatures).values([
-    {
-      meshId: "M-0001",
-      geometry: {
-        type: "Polygon",
-        coordinates: [
-          [
-            [-122.452, 37.757],
-            [-122.447, 37.757],
-            [-122.447, 37.761],
-            [-122.452, 37.761],
-            [-122.452, 37.757],
-          ],
-        ],
-      },
-      properties: { name: "Zone A", coverage: "mixed-use" },
-    },
-    {
-      meshId: "M-0002",
-      geometry: {
-        type: "Polygon",
-        coordinates: [
-          [
-            [-122.441, 37.762],
-            [-122.436, 37.762],
-            [-122.436, 37.766],
-            [-122.441, 37.766],
-            [-122.441, 37.762],
-          ],
-        ],
-      },
-      properties: { name: "Zone B", coverage: "green" },
-    },
-  ]);
+  await db.insert(meshIndex).values(meshIndexRows).onConflictDoNothing();
+  await db.insert(pointFeatures).values(points);
+  await db.insert(lineFeatures).values(lines);
+  await db.insert(polygonFeatures).values(polygons);
 }
 
 seed()
