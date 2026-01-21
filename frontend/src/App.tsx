@@ -105,45 +105,6 @@ function LayerBadge({
   );
 }
 
-function FeatureList({
-  layer,
-  label,
-}: {
-  layer: MeshLayer | undefined;
-  label: string;
-}) {
-  const items = layer?.features ?? [];
-  return (
-    <div className="space-y-2">
-      <div className="text-xs font-semibold uppercase tracking-[0.22em] text-ink/50">
-        {label} · {items.length}
-      </div>
-      {items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-ink/15 bg-white/70 p-3 text-[11px] text-ink/50">
-          No data returned.
-        </div>
-      ) : (
-        items.map((feature) => (
-          <div
-            key={`${label}-${feature.id}`}
-            className="rounded-lg border border-ink/10 bg-white/80 p-3 text-[11px] text-ink/70"
-          >
-            <div className="flex items-center justify-between text-[12px] font-semibold text-ink">
-              <span>{feature.meshId}</span>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-moss">
-                {feature.geometry.type}
-              </span>
-            </div>
-            <pre className="mt-2 whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-ink/70">
-              {JSON.stringify(feature.properties, null, 2)}
-            </pre>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
 export default function App() {
   const [selectedMeshIds, setSelectedMeshIds] = useState<string[]>([]);
   const [meshData, setMeshData] = useState<MeshLookupResponse | null>(null);
@@ -157,6 +118,10 @@ export default function App() {
     error: null,
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeMeshId, setActiveMeshId] = useState<string | null>(null);
+  const [activeLayerId, setActiveLayerId] = useState<string>("all");
+  const [featurePage, setFeaturePage] = useState(1);
+  const FEATURES_PER_PAGE = 8;
 
   const orderedMeshIds = useMemo(
     () => [...selectedMeshIds].sort(),
@@ -167,6 +132,9 @@ export default function App() {
     if (selectedMeshIds.length === 0) {
       setMeshData(null);
       setFetchState({ loading: false, error: null });
+      setActiveMeshId(null);
+      setActiveLayerId("all");
+      setFeaturePage(1);
       return;
     }
 
@@ -196,9 +164,31 @@ export default function App() {
     };
   }, [selectedMeshIds]);
 
+  useEffect(() => {
+    if (!meshData || meshData.meshes.length === 0) {
+      setActiveMeshId(null);
+      setActiveLayerId("all");
+      setFeaturePage(1);
+      return;
+    }
+    if (!activeMeshId || !meshData.meshes.some((mesh) => mesh.meshId === activeMeshId)) {
+      setActiveMeshId(meshData.meshes[0].meshId);
+      setActiveLayerId("all");
+      setFeaturePage(1);
+    }
+  }, [meshData, activeMeshId]);
+
+  useEffect(() => {
+    setActiveLayerId("all");
+    setFeaturePage(1);
+  }, [activeMeshId]);
+
   const handleClearSelection = () => {
     setSelectedMeshIds([]);
     setMeshData(null);
+    setActiveMeshId(null);
+    setActiveLayerId("all");
+    setFeaturePage(1);
   };
 
   const handleUploadClick = () => {
@@ -255,6 +245,72 @@ export default function App() {
     setUploadedName(null);
     setUploadError(null);
   };
+
+  const meshItems = meshData?.meshes ?? [];
+  const meshSummaries = useMemo(
+    () =>
+      meshItems.map((mesh) => {
+        const totalFeatures = mesh.layers.reduce(
+          (sum, layer) => sum + layer.features.length,
+          0
+        );
+        const hasData = mesh.presence.points || mesh.presence.lines || mesh.presence.polygons;
+        return {
+          meshId: mesh.meshId,
+          totalFeatures,
+          hasData,
+          layers: mesh.layers,
+          layerPresence: mesh.layerPresence ?? {},
+        };
+      }),
+    [meshItems]
+  );
+
+  const activeMesh = meshItems.find((mesh) => mesh.meshId === activeMeshId) ?? null;
+  const activeLayerIds = useMemo(() => {
+    if (!activeMesh) {
+      return [];
+    }
+    return Array.from(
+      new Set([
+        ...Object.keys(activeMesh.layerPresence ?? {}),
+        ...activeMesh.layers.map((layer) => layer.id),
+      ])
+    ).sort();
+  }, [activeMesh]);
+
+  const activeLayerMap = useMemo(() => {
+    if (!activeMesh) {
+      return new Map<string, MeshLayer>();
+    }
+    return new Map(activeMesh.layers.map((layer) => [layer.id, layer]));
+  }, [activeMesh]);
+
+  const activeFeatures = useMemo(() => {
+    if (!activeMesh) {
+      return [] as Array<MeshLayer["features"][number] & { layerId: string }>;
+    }
+    if (activeLayerId === "all") {
+      return activeMesh.layers.flatMap((layer) =>
+        layer.features.map((feature) => ({ ...feature, layerId: layer.id }))
+      );
+    }
+    const layer = activeLayerMap.get(activeLayerId);
+    return (layer?.features ?? []).map((feature) => ({
+      ...feature,
+      layerId: activeLayerId,
+    }));
+  }, [activeMesh, activeLayerId, activeLayerMap]);
+
+  const totalFeatures = meshSummaries.reduce(
+    (sum, mesh) => sum + mesh.totalFeatures,
+    0
+  );
+  const meshesWithData = meshSummaries.filter((mesh) => mesh.hasData).length;
+  const totalPages = Math.max(1, Math.ceil(activeFeatures.length / FEATURES_PER_PAGE));
+  const currentPage = Math.min(featurePage, totalPages);
+  const pageStart = (currentPage - 1) * FEATURES_PER_PAGE;
+  const pageItems = activeFeatures.slice(pageStart, pageStart + FEATURES_PER_PAGE);
 
   return (
     <div className="min-h-screen">
@@ -418,86 +474,196 @@ export default function App() {
                     No data yet. Select mesh ids to view backend results.
                   </div>
                 ) : (
-                  meshData.meshes.map((mesh) => {
-                    const layerMap = new Map(
-                      mesh.layers.map((layer) => [layer.id, layer])
-                    );
-                    const typeCounts = mesh.layers.reduce(
-                      (acc, layer) => {
-                        acc[layer.type] += layer.features.length;
-                        return acc;
-                      },
-                      { point: 0, line: 0, polygon: 0 }
-                    );
-                    const layerIds = Array.from(
-                      new Set([
-                        ...Object.keys(mesh.layerPresence ?? {}),
-                        ...mesh.layers.map((layer) => layer.id),
-                      ])
-                    ).sort();
-                    return (
-                      <div
-                        key={mesh.meshId}
-                        className="rounded-2xl border border-ink/10 bg-sand/80 p-4"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border border-ink/10 bg-sand/80 p-4">
+                        <div className="text-[11px] uppercase tracking-[0.2em] text-ink/50">
+                          Selected Meshes
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold text-ink">
+                          {meshSummaries.length}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-ink/10 bg-sand/80 p-4">
+                        <div className="text-[11px] uppercase tracking-[0.2em] text-ink/50">
+                          Meshes With Data
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold text-ink">
+                          {meshesWithData}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-ink/10 bg-sand/80 p-4">
+                        <div className="text-[11px] uppercase tracking-[0.2em] text-ink/50">
+                          Features Loaded
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold text-ink">
+                          {totalFeatures}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+                      <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/50">
+                          Meshes
+                        </div>
+                        <div className="mt-3 max-h-[420px] space-y-2 overflow-auto pr-1">
+                          {meshSummaries.map((mesh) => (
+                            <button
+                              key={mesh.meshId}
+                              type="button"
+                              onClick={() => setActiveMeshId(mesh.meshId)}
+                              className={`w-full rounded-xl border px-3 py-2 text-left text-xs transition ${
+                                mesh.meshId === activeMeshId
+                                  ? "border-ocean/40 bg-ocean/10 text-ocean"
+                                  : "border-ink/10 bg-white/80 text-ink/70 hover:-translate-y-0.5"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em]">
+                                <span>{mesh.meshId}</span>
+                                <span className="text-ink/40">
+                                  {mesh.totalFeatures} items
+                                </span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <span className="rounded-full bg-ink/5 px-2 py-1 text-[10px] text-ink/60">
+                                  Points {mesh.layers.filter((layer) => layer.type === "point").reduce((sum, layer) => sum + layer.features.length, 0)}
+                                </span>
+                                <span className="rounded-full bg-ink/5 px-2 py-1 text-[10px] text-ink/60">
+                                  Lines {mesh.layers.filter((layer) => layer.type === "line").reduce((sum, layer) => sum + layer.features.length, 0)}
+                                </span>
+                                <span className="rounded-full bg-ink/5 px-2 py-1 text-[10px] text-ink/60">
+                                  Polygons {mesh.layers.filter((layer) => layer.type === "polygon").reduce((sum, layer) => sum + layer.features.length, 0)}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-ink/10 bg-white/80 p-5">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
-                            <div className="text-lg font-semibold text-ink">
-                              {mesh.meshId}
+                            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/50">
+                              Inspector
                             </div>
-                            <div className="text-xs text-ink/60">
-                              Layer presence from mesh_index
+                            <div className="mt-2 text-lg font-semibold text-ink">
+                              {activeMesh?.meshId ?? "Select a mesh"}
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <LayerBadge
                               label="Points"
-                              count={typeCounts.point}
-                              active={mesh.presence.points}
+                              count={activeMesh?.layers.filter((layer) => layer.type === "point").reduce((sum, layer) => sum + layer.features.length, 0) ?? 0}
+                              active={Boolean(activeMesh?.presence.points)}
                             />
                             <LayerBadge
                               label="Lines"
-                              count={typeCounts.line}
-                              active={mesh.presence.lines}
+                              count={activeMesh?.layers.filter((layer) => layer.type === "line").reduce((sum, layer) => sum + layer.features.length, 0) ?? 0}
+                              active={Boolean(activeMesh?.presence.lines)}
                             />
                             <LayerBadge
                               label="Polygons"
-                              count={typeCounts.polygon}
-                              active={mesh.presence.polygons}
+                              count={activeMesh?.layers.filter((layer) => layer.type === "polygon").reduce((sum, layer) => sum + layer.features.length, 0) ?? 0}
+                              active={Boolean(activeMesh?.presence.polygons)}
                             />
                           </div>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {layerIds.length === 0 ? (
-                            <div className="text-xs text-ink/50">
-                              No layers flagged for this mesh.
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setActiveLayerId("all")}
+                            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                              activeLayerId === "all"
+                                ? "bg-ocean/15 text-ocean"
+                                : "bg-ink/5 text-ink/60 hover:-translate-y-0.5"
+                            }`}
+                          >
+                            All layers
+                          </button>
+                          {activeLayerIds.map((layerId) => {
+                            const layer = activeLayerMap.get(layerId);
+                            return (
+                              <button
+                                key={layerId}
+                                type="button"
+                                onClick={() => setActiveLayerId(layerId)}
+                                className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                                  activeLayerId === layerId
+                                    ? "bg-ocean/15 text-ocean"
+                                    : "bg-ink/5 text-ink/60 hover:-translate-y-0.5"
+                                }`}
+                              >
+                                {formatLayerLabel(layerId)}{" "}
+                                <span className="ml-1 text-[10px] text-ink/40">
+                                  {layer?.features.length ?? 0}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                          {activeFeatures.length === 0 ? (
+                            <div className="rounded-lg border border-dashed border-ink/15 bg-white/70 p-4 text-[11px] text-ink/50">
+                              No features for this mesh/layer.
                             </div>
                           ) : (
-                            layerIds.map((layerId) => {
-                              const layer = layerMap.get(layerId);
-                              return (
-                                <LayerBadge
-                                  key={layerId}
-                                  label={formatLayerLabel(layerId)}
-                                  count={layer?.features.length ?? 0}
-                                  active={Boolean(mesh.layerPresence?.[layerId])}
-                                />
-                              );
-                            })
+                            pageItems.map((feature) => (
+                              <div
+                                key={`${feature.layerId}-${feature.id}`}
+                                className="rounded-xl border border-ink/10 bg-white/90 p-4 text-[11px] text-ink/70"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] font-semibold text-ink">
+                                  <span>{feature.meshId}</span>
+                                  <span className="rounded-full bg-ink/5 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-ink/60">
+                                    {formatLayerLabel(feature.layerId)}
+                                  </span>
+                                  <span className="text-[10px] uppercase tracking-[0.2em] text-moss">
+                                    {feature.geometry.type}
+                                  </span>
+                                </div>
+                                <pre className="mt-2 whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-ink/70">
+                                  {JSON.stringify(feature.properties, null, 2)}
+                                </pre>
+                              </div>
+                            ))
                           )}
                         </div>
-                        <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                          {layerIds.map((layerId) => (
-                            <FeatureList
-                              key={layerId}
-                              label={formatLayerLabel(layerId)}
-                              layer={layerMap.get(layerId)}
-                            />
-                          ))}
-                        </div>
+
+                        {activeFeatures.length > 0 && (
+                          <div className="mt-4 flex items-center justify-between text-xs text-ink/60">
+                            <span>
+                              Page {currentPage} of {totalPages}
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setFeaturePage((prev) => Math.max(1, prev - 1))
+                                }
+                                disabled={currentPage === 1}
+                                className="rounded-full border border-ink/10 bg-white/80 px-3 py-1 text-[11px] text-ink/60 transition disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Prev
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setFeaturePage((prev) => Math.min(totalPages, prev + 1))
+                                }
+                                disabled={currentPage === totalPages}
+                                className="rounded-full border border-ink/10 bg-white/80 px-3 py-1 text-[11px] text-ink/60 transition disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })
+                    </div>
+                  </>
                 )}
               </div>
             </section>
