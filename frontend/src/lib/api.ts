@@ -9,6 +9,16 @@ export type MeshPresenceResponse = {
   }>;
 };
 
+export type LayerCatalogItem = {
+  layerName: string;
+  geometryType: "point" | "line" | "polygon";
+  sourceFile: string;
+};
+
+export type LayerCatalogResponse = {
+  layers: LayerCatalogItem[];
+};
+
 export async function fetchMeshData(meshIds: string[]): Promise<MeshLookupResponse> {
   const response = await fetch(`${API_BASE}/api/mesh/lookup`, {
     method: "POST",
@@ -21,6 +31,16 @@ export async function fetchMeshData(meshIds: string[]): Promise<MeshLookupRespon
   }
 
   return (await response.json()) as MeshLookupResponse;
+}
+
+export async function fetchLayerCatalog(): Promise<LayerCatalogResponse> {
+  const response = await fetch(`${API_BASE}/api/mesh/layers`);
+
+  if (!response.ok) {
+    throw new Error(`リクエストに失敗しました (${response.status})`);
+  }
+
+  return (await response.json()) as LayerCatalogResponse;
 }
 
 export async function fetchMeshPresence(

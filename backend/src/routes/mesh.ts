@@ -56,6 +56,23 @@ router.post("/presence", async (req, res) => {
   }
 });
 
+router.get("/layers", async (_req, res) => {
+  try {
+    const rows = await db.select().from(layerRegistry);
+    const layers = rows
+      .map((row) => ({
+        layerName: row.layerName,
+        geometryType: row.geometryType,
+        sourceFile: row.sourceFile,
+      }))
+      .sort((a, b) => a.layerName.localeCompare(b.layerName));
+    return res.json({ layers });
+  } catch (error) {
+    console.error("Layer registry lookup failed", error);
+    return res.status(500).json({ error: "Failed to fetch layer registry" });
+  }
+});
+
 router.post("/lookup", async (req, res) => {
   const meshIds = req.body?.meshIds;
 

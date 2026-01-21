@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import MapView from "./components/MapView";
-import { fetchMeshData } from "./lib/api";
+import { fetchLayerCatalog, fetchMeshData } from "./lib/api";
 import type {
   MeshLayer,
   MeshLookupResponse,
 } from "./lib/types";
+import type { LayerCatalogItem } from "./lib/api";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 
 type FetchState = {
@@ -83,6 +84,16 @@ function formatLayerLabel(id: string) {
     .join(" ");
 }
 
+function formatGeometryType(type: LayerCatalogItem["geometryType"]) {
+  if (type === "point") {
+    return "ポイント";
+  }
+  if (type === "line") {
+    return "ライン";
+  }
+  return "ポリゴン";
+}
+
 function LayerBadge({
   label,
   count,
@@ -114,6 +125,11 @@ export default function App() {
   const [uploadedName, setUploadedName] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [fetchState, setFetchState] = useState<FetchState>({
+    loading: false,
+    error: null,
+  });
+  const [layerCatalog, setLayerCatalog] = useState<LayerCatalogItem[]>([]);
+  const [layerCatalogState, setLayerCatalogState] = useState<FetchState>({
     loading: false,
     error: null,
   });
@@ -163,6 +179,33 @@ export default function App() {
       active = false;
     };
   }, [selectedMeshIds]);
+
+  useEffect(() => {
+    let active = true;
+    setLayerCatalogState({ loading: true, error: null });
+    fetchLayerCatalog()
+      .then((data) => {
+        if (!active) {
+          return;
+        }
+        setLayerCatalog(data.layers);
+        setLayerCatalogState({ loading: false, error: null });
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+        setLayerCatalog([]);
+        setLayerCatalogState({
+          loading: false,
+          error: "レイヤー一覧の取得に失敗しました。",
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!meshData || meshData.meshes.length === 0) {
@@ -411,6 +454,55 @@ export default function App() {
                   )}
                 </div>
               )}
+            </section>
+
+            <section className="rounded-2xl border border-white/70 bg-white/75 p-5 shadow-glow backdrop-blur">
+              <div className="text-xs font-semibold uppercase tracking-[0.3em] text-ink/50">
+                バックエンドのレイヤー
+              </div>
+              <div className="mt-4 space-y-3 text-xs text-ink/70">
+                {layerCatalogState.loading && (
+                  <div className="text-sm text-ink/50">読み込み中...</div>
+                )}
+                {layerCatalogState.error && (
+                  <div className="text-sm text-clay">{layerCatalogState.error}</div>
+                )}
+                {!layerCatalogState.loading &&
+                  !layerCatalogState.error &&
+                  layerCatalog.length === 0 && (
+                    <div className="text-sm text-ink/50">
+                      まだレイヤーが登録されていません。
+                    </div>
+                  )}
+                {!layerCatalogState.loading &&
+                  !layerCatalogState.error &&
+                  layerCatalog.length > 0 && (
+                    <div className="space-y-2">
+                      {layerCatalog.map((layer) => (
+                        <div
+                          key={layer.layerName}
+                          className="rounded-xl border border-ink/10 bg-white/80 p-3"
+                        >
+                          <div className="flex items-center gap-2 text-[10px] text-ink/50">
+                            <span className="rounded-full bg-ink/5 px-2 py-1 text-[10px] font-semibold text-ink/60">
+                              {formatGeometryType(layer.geometryType)}
+                            </span>
+                            <span className="text-ink/40">ソース</span>
+                            <span
+                              className="min-w-0 flex-1 truncate font-mono text-[10px] text-ink/50"
+                              title={layer.sourceFile}
+                            >
+                              {layer.sourceFile}
+                            </span>
+                          </div>
+                          <div className="mt-2 text-sm font-semibold text-ink">
+                            {formatLayerLabel(layer.layerName)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </div>
             </section>
 
             <section className="rounded-2xl border border-white/70 bg-white/75 p-5 shadow-glow backdrop-blur">
