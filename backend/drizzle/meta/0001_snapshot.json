@@ -1,0 +1,423 @@
+{
+  "id": "5065fa74-d07d-46a9-b6cb-f4e1cf8332d5",
+  "prevId": "20128a59-13a2-4a9c-b4d1-cb0286600d7f",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.line_features": {
+      "name": "line_features",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "mesh_id": {
+          "name": "mesh_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "geometry": {
+          "name": "geometry",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "properties": {
+          "name": "properties",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "line_features_mesh_id_mesh_index_mesh_id_fk": {
+          "name": "line_features_mesh_id_mesh_index_mesh_id_fk",
+          "tableFrom": "line_features",
+          "tableTo": "mesh_index",
+          "columnsFrom": [
+            "mesh_id"
+          ],
+          "columnsTo": [
+            "mesh_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.line_mesh_map": {
+      "name": "line_mesh_map",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "line_id": {
+          "name": "line_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mesh_id": {
+          "name": "mesh_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "geometry": {
+          "name": "geometry",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "properties": {
+          "name": "properties",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "length_m": {
+          "name": "length_m",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "length_ratio": {
+          "name": "length_ratio",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "line_mesh_map_line_id_line_features_id_fk": {
+          "name": "line_mesh_map_line_id_line_features_id_fk",
+          "tableFrom": "line_mesh_map",
+          "tableTo": "line_features",
+          "columnsFrom": [
+            "line_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "line_mesh_map_mesh_id_mesh_index_mesh_id_fk": {
+          "name": "line_mesh_map_mesh_id_mesh_index_mesh_id_fk",
+          "tableFrom": "line_mesh_map",
+          "tableTo": "mesh_index",
+          "columnsFrom": [
+            "mesh_id"
+          ],
+          "columnsTo": [
+            "mesh_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.mesh_index": {
+      "name": "mesh_index",
+      "schema": "",
+      "columns": {
+        "mesh_id": {
+          "name": "mesh_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "has_points": {
+          "name": "has_points",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "has_lines": {
+          "name": "has_lines",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "has_polygons": {
+          "name": "has_polygons",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.point_features": {
+      "name": "point_features",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "mesh_id": {
+          "name": "mesh_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "geometry": {
+          "name": "geometry",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "properties": {
+          "name": "properties",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "point_features_mesh_id_mesh_index_mesh_id_fk": {
+          "name": "point_features_mesh_id_mesh_index_mesh_id_fk",
+          "tableFrom": "point_features",
+          "tableTo": "mesh_index",
+          "columnsFrom": [
+            "mesh_id"
+          ],
+          "columnsTo": [
+            "mesh_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.polygon_features": {
+      "name": "polygon_features",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "mesh_id": {
+          "name": "mesh_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "geometry": {
+          "name": "geometry",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "properties": {
+          "name": "properties",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "polygon_features_mesh_id_mesh_index_mesh_id_fk": {
+          "name": "polygon_features_mesh_id_mesh_index_mesh_id_fk",
+          "tableFrom": "polygon_features",
+          "tableTo": "mesh_index",
+          "columnsFrom": [
+            "mesh_id"
+          ],
+          "columnsTo": [
+            "mesh_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.polygon_mesh_map": {
+      "name": "polygon_mesh_map",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "polygon_id": {
+          "name": "polygon_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mesh_id": {
+          "name": "mesh_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "geometry": {
+          "name": "geometry",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "properties": {
+          "name": "properties",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "area_m2": {
+          "name": "area_m2",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "area_ratio": {
+          "name": "area_ratio",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "polygon_mesh_map_polygon_id_polygon_features_id_fk": {
+          "name": "polygon_mesh_map_polygon_id_polygon_features_id_fk",
+          "tableFrom": "polygon_mesh_map",
+          "tableTo": "polygon_features",
+          "columnsFrom": [
+            "polygon_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "polygon_mesh_map_mesh_id_mesh_index_mesh_id_fk": {
+          "name": "polygon_mesh_map_mesh_id_mesh_index_mesh_id_fk",
+          "tableFrom": "polygon_mesh_map",
+          "tableTo": "mesh_index",
+          "columnsFrom": [
+            "mesh_id"
+          ],
+          "columnsTo": [
+            "mesh_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

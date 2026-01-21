@@ -1,4 +1,13 @@
-import { pgTable, text, boolean, jsonb, serial, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  boolean,
+  jsonb,
+  serial,
+  timestamp,
+  doublePrecision,
+  integer,
+} from "drizzle-orm/pg-core";
 import type { Geometry } from "geojson";
 
 export const meshIndex = pgTable("mesh_index", {
@@ -37,5 +46,35 @@ export const polygonFeatures = pgTable("polygon_features", {
     .references(() => meshIndex.meshId, { onDelete: "cascade" }),
   geometry: jsonb("geometry").$type<Geometry>().notNull(),
   properties: jsonb("properties").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const lineMeshMap = pgTable("line_mesh_map", {
+  id: serial("id").primaryKey(),
+  lineId: integer("line_id")
+    .notNull()
+    .references(() => lineFeatures.id, { onDelete: "cascade" }),
+  meshId: text("mesh_id")
+    .notNull()
+    .references(() => meshIndex.meshId, { onDelete: "cascade" }),
+  geometry: jsonb("geometry").$type<Geometry>().notNull(),
+  properties: jsonb("properties").$type<Record<string, unknown>>().notNull().default({}),
+  lengthM: doublePrecision("length_m").notNull(),
+  lengthRatio: doublePrecision("length_ratio").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const polygonMeshMap = pgTable("polygon_mesh_map", {
+  id: serial("id").primaryKey(),
+  polygonId: integer("polygon_id")
+    .notNull()
+    .references(() => polygonFeatures.id, { onDelete: "cascade" }),
+  meshId: text("mesh_id")
+    .notNull()
+    .references(() => meshIndex.meshId, { onDelete: "cascade" }),
+  geometry: jsonb("geometry").$type<Geometry>().notNull(),
+  properties: jsonb("properties").$type<Record<string, unknown>>().notNull().default({}),
+  areaM2: doublePrecision("area_m2").notNull(),
+  areaRatio: doublePrecision("area_ratio").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });

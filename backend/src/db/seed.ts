@@ -8,6 +8,7 @@ import {
 } from "./schema.js";
 import { meshCode250 } from "../utils/jisMesh.js";
 import type { LineString, Point, Polygon } from "geojson";
+import { mapLinePolygonMeshes } from "./mapMeshes.js";
 
 async function seed() {
   const pointSamples = [
@@ -128,6 +129,8 @@ async function seed() {
   await db.insert(pointFeatures).values(points);
   await db.insert(lineFeatures).values(lines);
   await db.insert(polygonFeatures).values(polygons);
+
+  await mapLinePolygonMeshes();
 }
 
 seed()

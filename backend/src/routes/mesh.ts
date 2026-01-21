@@ -2,10 +2,10 @@ import { Router } from "express";
 import { inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
-  lineFeatures,
+  lineMeshMap,
   meshIndex,
   pointFeatures,
-  polygonFeatures,
+  polygonMeshMap,
 } from "../db/schema.js";
 
 const router = Router();
@@ -36,12 +36,12 @@ router.post("/lookup", async (req, res) => {
         .where(inArray(pointFeatures.meshId, uniqueMeshIds)),
       db
         .select()
-        .from(lineFeatures)
-        .where(inArray(lineFeatures.meshId, uniqueMeshIds)),
+        .from(lineMeshMap)
+        .where(inArray(lineMeshMap.meshId, uniqueMeshIds)),
       db
         .select()
-        .from(polygonFeatures)
-        .where(inArray(polygonFeatures.meshId, uniqueMeshIds)),
+        .from(polygonMeshMap)
+        .where(inArray(polygonMeshMap.meshId, uniqueMeshIds)),
     ]);
 
     const meshMap = new Map(
