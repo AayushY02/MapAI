@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx src/db/seed.ts",
+    "db:seed": "tsx src/db/ingestGeojson.ts",
+    "db:ingest": "tsx src/db/ingestGeojson.ts",
     "db:map": "tsx src/db/mapMeshesRunner.ts"
   },
   "keywords": [],

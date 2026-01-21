@@ -6,6 +6,10 @@ export type MeshPresence = {
   polygons: boolean;
 };
 
+export type MeshLayerId = string;
+
+export type MeshLayerType = "point" | "line" | "polygon";
+
 export type MeshFeature = {
   id: number;
   meshId: string;
@@ -13,12 +17,17 @@ export type MeshFeature = {
   geometry: Geometry;
 };
 
+export type MeshLayer = {
+  id: MeshLayerId;
+  type: MeshLayerType;
+  features: MeshFeature[];
+};
+
 export type MeshLookupItem = {
   meshId: string;
   presence: MeshPresence;
-  points: MeshFeature[];
-  lines: MeshFeature[];
-  polygons: MeshFeature[];
+  layerPresence: Record<string, boolean>;
+  layers: MeshLayer[];
 };
 
 export type MeshLookupResponse = {

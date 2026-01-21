@@ -15,11 +15,16 @@ export const meshIndex = pgTable("mesh_index", {
   hasPoints: boolean("has_points").notNull().default(false),
   hasLines: boolean("has_lines").notNull().default(false),
   hasPolygons: boolean("has_polygons").notNull().default(false),
+  layerPresence: jsonb("layer_presence")
+    .$type<Record<string, boolean>>()
+    .notNull()
+    .default({}),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 export const pointFeatures = pgTable("point_features", {
   id: serial("id").primaryKey(),
+  sourceLayer: text("source_layer").notNull(),
   meshId: text("mesh_id")
     .notNull()
     .references(() => meshIndex.meshId, { onDelete: "cascade" }),
@@ -31,6 +36,7 @@ export const pointFeatures = pgTable("point_features", {
 
 export const lineFeatures = pgTable("line_features", {
   id: serial("id").primaryKey(),
+  sourceLayer: text("source_layer").notNull(),
   meshId: text("mesh_id")
     .notNull()
     .references(() => meshIndex.meshId, { onDelete: "cascade" }),
@@ -41,6 +47,7 @@ export const lineFeatures = pgTable("line_features", {
 
 export const polygonFeatures = pgTable("polygon_features", {
   id: serial("id").primaryKey(),
+  sourceLayer: text("source_layer").notNull(),
   meshId: text("mesh_id")
     .notNull()
     .references(() => meshIndex.meshId, { onDelete: "cascade" }),
@@ -51,6 +58,7 @@ export const polygonFeatures = pgTable("polygon_features", {
 
 export const lineMeshMap = pgTable("line_mesh_map", {
   id: serial("id").primaryKey(),
+  sourceLayer: text("source_layer").notNull(),
   lineId: integer("line_id")
     .notNull()
     .references(() => lineFeatures.id, { onDelete: "cascade" }),
@@ -66,6 +74,7 @@ export const lineMeshMap = pgTable("line_mesh_map", {
 
 export const polygonMeshMap = pgTable("polygon_mesh_map", {
   id: serial("id").primaryKey(),
+  sourceLayer: text("source_layer").notNull(),
   polygonId: integer("polygon_id")
     .notNull()
     .references(() => polygonFeatures.id, { onDelete: "cascade" }),
@@ -76,5 +85,15 @@ export const polygonMeshMap = pgTable("polygon_mesh_map", {
   properties: jsonb("properties").$type<Record<string, unknown>>().notNull().default({}),
   areaM2: doublePrecision("area_m2").notNull(),
   areaRatio: doublePrecision("area_ratio").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const layerRegistry = pgTable("layer_registry", {
+  id: serial("id").primaryKey(),
+  layerName: text("layer_name").notNull().unique(),
+  tableName: text("table_name").notNull(),
+  geometryType: text("geometry_type").notNull(),
+  meshMapTable: text("mesh_map_table"),
+  sourceFile: text("source_file").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type MapLayerMouseEvent } from "maplibre-gl";
 import type { FeatureCollection, Polygon } from "geojson";
+import { fetchMeshPresence } from "../lib/api";
 
 const JAPAN_BOUNDS: [number, number, number, number] = [
   122.93,
@@ -23,6 +24,7 @@ const EMPTY_COLLECTION: FeatureCollection<Polygon> = {
 type MapViewProps = {
   selectedMeshIds: string[];
   onSelectionChange: (meshIds: string[]) => void;
+  highlightData: boolean;
 };
 
 function meshCode250(lat: number, lon: number): string {
@@ -130,11 +132,18 @@ function buildMeshGrid(
 export default function MapView({
   selectedMeshIds,
   onSelectionChange,
+  highlightData,
 }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const mapLoadedRef = useRef(false);
   const selectedRef = useRef<Set<string>>(new Set());
   const hoveredIdRef = useRef<string | null>(null);
+  const highlightedRef = useRef<Set<string>>(new Set());
+  const highlightEnabledRef = useRef(false);
+  const presenceRequestRef = useRef(0);
+  const lastGridMeshIdsRef = useRef<string[]>([]);
+  const presenceFetcherRef = useRef<(meshIds: string[]) => void>(() => {});
   const [hoveredMeshId, setHoveredMeshId] = useState<string | null>(null);
   const [gridStatus, setGridStatus] = useState<"ready" | "zoom" | "dense">(
     "zoom"
@@ -143,6 +152,28 @@ export default function MapView({
   useEffect(() => {
     selectedRef.current = new Set(selectedMeshIds);
   }, [selectedMeshIds]);
+
+  useEffect(() => {
+    highlightEnabledRef.current = highlightData;
+    const map = mapRef.current;
+    if (!map || !mapLoadedRef.current) {
+      return;
+    }
+    const source = map.getSource(SOURCE_ID);
+    if (!source) {
+      return;
+    }
+
+    if (!highlightData) {
+      highlightedRef.current.forEach((meshId) => {
+        map.setFeatureState({ source: SOURCE_ID, id: meshId }, { hasData: false });
+      });
+      highlightedRef.current = new Set();
+      return;
+    }
+
+    presenceFetcherRef.current(lastGridMeshIdsRef.current);
+  }, [highlightData]);
 
   useEffect(() => {
     if (!mapContainerRef.current) {
@@ -166,6 +197,7 @@ export default function MapView({
     map.addControl(new maplibregl.NavigationControl(), "top-right");
 
     map.on("load", () => {
+      mapLoadedRef.current = true;
       map.addSource(SOURCE_ID, {
         type: "geojson",
         data: EMPTY_COLLECTION,
@@ -183,6 +215,8 @@ export default function MapView({
             "#2a79b6",
             ["boolean", ["feature-state", "hover"], false],
             "#c76c4c",
+            ["boolean", ["feature-state", "hasData"], false],
+            "#4c9f70",
             "rgba(42, 121, 182, 0.15)",
           ],
           "fill-opacity": [
@@ -191,6 +225,8 @@ export default function MapView({
             0.65,
             ["boolean", ["feature-state", "hover"], false],
             0.55,
+            ["boolean", ["feature-state", "hasData"], false],
+            0.45,
             0.35,
           ],
         },
@@ -206,6 +242,50 @@ export default function MapView({
         },
       });
 
+      const requestPresence = async (meshIds: string[]) => {
+        if (!highlightEnabledRef.current || meshIds.length === 0) {
+          return;
+        }
+        const requestId = (presenceRequestRef.current += 1);
+        try {
+          const response = await fetchMeshPresence(meshIds);
+          if (presenceRequestRef.current !== requestId) {
+            return;
+          }
+          if (!highlightEnabledRef.current) {
+            return;
+          }
+          const next = new Set(
+            response.meshes.filter((mesh) => mesh.hasData).map((mesh) => mesh.meshId)
+          );
+          const mapInstance = mapRef.current;
+          if (!mapInstance) {
+            return;
+          }
+          highlightedRef.current.forEach((meshId) => {
+            if (!next.has(meshId)) {
+              mapInstance.setFeatureState(
+                { source: SOURCE_ID, id: meshId },
+                { hasData: false }
+              );
+            }
+          });
+          next.forEach((meshId) => {
+            if (!highlightedRef.current.has(meshId)) {
+              mapInstance.setFeatureState(
+                { source: SOURCE_ID, id: meshId },
+                { hasData: true }
+              );
+            }
+          });
+          highlightedRef.current = next;
+        } catch (error) {
+          console.error("Failed to fetch mesh presence", error);
+        }
+      };
+
+      presenceFetcherRef.current = requestPresence;
+
       const updateGrid = () => {
         const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
         if (!source) {
@@ -217,6 +297,16 @@ export default function MapView({
           setGridStatus("zoom");
           hoveredIdRef.current = null;
           setHoveredMeshId(null);
+          lastGridMeshIdsRef.current = [];
+          if (highlightEnabledRef.current) {
+            highlightedRef.current.forEach((meshId) => {
+              map.setFeatureState(
+                { source: SOURCE_ID, id: meshId },
+                { hasData: false }
+              );
+            });
+            highlightedRef.current = new Set();
+          }
           return;
         }
 
@@ -226,6 +316,16 @@ export default function MapView({
           setGridStatus("dense");
           hoveredIdRef.current = null;
           setHoveredMeshId(null);
+          lastGridMeshIdsRef.current = [];
+          if (highlightEnabledRef.current) {
+            highlightedRef.current.forEach((meshId) => {
+              map.setFeatureState(
+                { source: SOURCE_ID, id: meshId },
+                { hasData: false }
+              );
+            });
+            highlightedRef.current = new Set();
+          }
           return;
         }
 
@@ -237,6 +337,22 @@ export default function MapView({
             { selected: true }
           );
         });
+        if (highlightEnabledRef.current) {
+          highlightedRef.current.forEach((meshId) => {
+            map.setFeatureState(
+              { source: SOURCE_ID, id: meshId },
+              { hasData: true }
+            );
+          });
+        }
+
+        const meshIds = collection.features
+          .map((feature) => String(feature.properties?.mesh_id ?? feature.id))
+          .filter(Boolean);
+        lastGridMeshIdsRef.current = meshIds;
+        if (highlightEnabledRef.current) {
+          requestPresence(meshIds);
+        }
       };
 
       updateGrid();
@@ -306,13 +422,19 @@ export default function MapView({
     });
 
     return () => {
+      mapLoadedRef.current = false;
+      mapRef.current = null;
       map.remove();
     };
   }, [onSelectionChange]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.getSource(SOURCE_ID)) {
+    if (!map || !mapLoadedRef.current) {
+      return;
+    }
+    const source = map.getSource(SOURCE_ID);
+    if (!source) {
       return;
     }
 

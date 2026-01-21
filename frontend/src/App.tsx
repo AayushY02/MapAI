@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import MapView from "./components/MapView";
 import { fetchMeshData } from "./lib/api";
-import type { MeshLookupItem, MeshLookupResponse } from "./lib/types";
+import type {
+  MeshLayer,
+  MeshLookupResponse,
+} from "./lib/types";
 
 type FetchState = {
   loading: boolean;
@@ -12,24 +15,72 @@ const schemaTiles = [
   {
     title: "mesh_index",
     detail: "Primary table for every mesh_id",
-    columns: ["mesh_id", "has_points", "has_lines", "has_polygons"],
+    columns: [
+      "mesh_id",
+      "has_points",
+      "has_lines",
+      "has_polygons",
+      "layer_presence",
+    ],
   },
   {
     title: "point_features",
-    detail: "GeoJSON point records per mesh",
-    columns: ["mesh_id", "geometry", "properties"],
+    detail: "All point layers in one table",
+    columns: ["source_layer", "mesh_id", "geometry", "properties"],
   },
   {
     title: "line_features",
-    detail: "GeoJSON line records per mesh",
-    columns: ["mesh_id", "geometry", "properties"],
+    detail: "All line layers in one table",
+    columns: ["source_layer", "mesh_id", "geometry", "properties"],
   },
   {
     title: "polygon_features",
-    detail: "GeoJSON polygon records per mesh",
+    detail: "All polygon layers in one table",
+    columns: ["source_layer", "mesh_id", "geometry", "properties"],
+  },
+  {
+    title: "line_mesh_map",
+    detail: "Clipped lines per mesh (all layers)",
+    columns: [
+      "source_layer",
+      "mesh_id",
+      "line_id",
+      "geometry",
+      "length_m",
+      "length_ratio",
+    ],
+  },
+  {
+    title: "polygon_mesh_map",
+    detail: "Clipped polygons per mesh (all layers)",
+    columns: [
+      "source_layer",
+      "mesh_id",
+      "polygon_id",
+      "geometry",
+      "area_m2",
+      "area_ratio",
+    ],
+  },
+  {
+    title: "layer_registry",
+    detail: "Registry for per-file layer tables",
+    columns: ["layer_name", "table_name", "geometry_type", "mesh_map_table"],
+  },
+  {
+    title: "dynamic layer tables",
+    detail: "One table per GeoJSON file (plus *_mesh_map for lines/polygons)",
     columns: ["mesh_id", "geometry", "properties"],
   },
 ];
+
+function formatLayerLabel(id: string) {
+  return id
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
 function LayerBadge({
   label,
@@ -54,12 +105,13 @@ function LayerBadge({
 }
 
 function FeatureList({
-  items,
+  layer,
   label,
 }: {
-  items: MeshLookupItem["points"];
+  layer: MeshLayer | undefined;
   label: string;
 }) {
+  const items = layer?.features ?? [];
   return (
     <div className="space-y-2">
       <div className="text-xs font-semibold uppercase tracking-[0.22em] text-ink/50">
@@ -94,6 +146,7 @@ function FeatureList({
 export default function App() {
   const [selectedMeshIds, setSelectedMeshIds] = useState<string[]>([]);
   const [meshData, setMeshData] = useState<MeshLookupResponse | null>(null);
+  const [highlightData, setHighlightData] = useState(false);
   const [fetchState, setFetchState] = useState<FetchState>({
     loading: false,
     error: null,
@@ -163,6 +216,18 @@ export default function App() {
               Selected {selectedMeshIds.length}
             </div>
             <button
+              className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] transition ${
+                highlightData
+                  ? "border-moss/40 bg-moss text-sand"
+                  : "border-white/60 bg-white/80 text-moss hover:-translate-y-0.5"
+              }`}
+              onClick={() => setHighlightData((prev) => !prev)}
+              type="button"
+              aria-pressed={highlightData}
+            >
+              {highlightData ? "Highlight On" : "Highlight Off"}
+            </button>
+            <button
               className="rounded-full border border-ink/10 bg-ink px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-sand transition hover:-translate-y-0.5 hover:bg-ink/90"
               onClick={handleClearSelection}
               type="button"
@@ -230,6 +295,7 @@ export default function App() {
               <MapView
                 selectedMeshIds={selectedMeshIds}
                 onSelectionChange={setSelectedMeshIds}
+                highlightData={highlightData}
               />
             </section>
 
@@ -253,45 +319,86 @@ export default function App() {
                     No data yet. Select mesh ids to view backend results.
                   </div>
                 ) : (
-                  meshData.meshes.map((mesh) => (
-                    <div
-                      key={mesh.meshId}
-                      className="rounded-2xl border border-ink/10 bg-sand/80 p-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <div className="text-lg font-semibold text-ink">
-                            {mesh.meshId}
+                  meshData.meshes.map((mesh) => {
+                    const layerMap = new Map(
+                      mesh.layers.map((layer) => [layer.id, layer])
+                    );
+                    const typeCounts = mesh.layers.reduce(
+                      (acc, layer) => {
+                        acc[layer.type] += layer.features.length;
+                        return acc;
+                      },
+                      { point: 0, line: 0, polygon: 0 }
+                    );
+                    const layerIds = Array.from(
+                      new Set([
+                        ...Object.keys(mesh.layerPresence ?? {}),
+                        ...mesh.layers.map((layer) => layer.id),
+                      ])
+                    ).sort();
+                    return (
+                      <div
+                        key={mesh.meshId}
+                        className="rounded-2xl border border-ink/10 bg-sand/80 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="text-lg font-semibold text-ink">
+                              {mesh.meshId}
+                            </div>
+                            <div className="text-xs text-ink/60">
+                              Layer presence from mesh_index
+                            </div>
                           </div>
-                          <div className="text-xs text-ink/60">
-                            Layer presence from mesh_index
+                          <div className="flex flex-wrap gap-2">
+                            <LayerBadge
+                              label="Points"
+                              count={typeCounts.point}
+                              active={mesh.presence.points}
+                            />
+                            <LayerBadge
+                              label="Lines"
+                              count={typeCounts.line}
+                              active={mesh.presence.lines}
+                            />
+                            <LayerBadge
+                              label="Polygons"
+                              count={typeCounts.polygon}
+                              active={mesh.presence.polygons}
+                            />
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <LayerBadge
-                            label="Points"
-                            count={mesh.points.length}
-                            active={mesh.presence.points}
-                          />
-                          <LayerBadge
-                            label="Lines"
-                            count={mesh.lines.length}
-                            active={mesh.presence.lines}
-                          />
-                          <LayerBadge
-                            label="Polygons"
-                            count={mesh.polygons.length}
-                            active={mesh.presence.polygons}
-                          />
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {layerIds.length === 0 ? (
+                            <div className="text-xs text-ink/50">
+                              No layers flagged for this mesh.
+                            </div>
+                          ) : (
+                            layerIds.map((layerId) => {
+                              const layer = layerMap.get(layerId);
+                              return (
+                                <LayerBadge
+                                  key={layerId}
+                                  label={formatLayerLabel(layerId)}
+                                  count={layer?.features.length ?? 0}
+                                  active={Boolean(mesh.layerPresence?.[layerId])}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
+                        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                          {layerIds.map((layerId) => (
+                            <FeatureList
+                              key={layerId}
+                              label={formatLayerLabel(layerId)}
+                              layer={layerMap.get(layerId)}
+                            />
+                          ))}
                         </div>
                       </div>
-                      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                        <FeatureList label="Points" items={mesh.points} />
-                        <FeatureList label="Lines" items={mesh.lines} />
-                        <FeatureList label="Polygons" items={mesh.polygons} />
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </section>
