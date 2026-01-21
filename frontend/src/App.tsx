@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import MapView from "./components/MapView";
 import { fetchMeshData } from "./lib/api";
 import type {
   MeshLayer,
   MeshLookupResponse,
 } from "./lib/types";
+import type { Feature, FeatureCollection, Geometry } from "geojson";
 
 type FetchState = {
   loading: boolean;
@@ -147,10 +148,15 @@ export default function App() {
   const [selectedMeshIds, setSelectedMeshIds] = useState<string[]>([]);
   const [meshData, setMeshData] = useState<MeshLookupResponse | null>(null);
   const [highlightData, setHighlightData] = useState(false);
+  const [uploadedGeojson, setUploadedGeojson] =
+    useState<FeatureCollection<Geometry> | null>(null);
+  const [uploadedName, setUploadedName] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [fetchState, setFetchState] = useState<FetchState>({
     loading: false,
     error: null,
   });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const orderedMeshIds = useMemo(
     () => [...selectedMeshIds].sort(),
@@ -195,6 +201,61 @@ export default function App() {
     setMeshData(null);
   };
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as unknown;
+      let collection: FeatureCollection<Geometry> | null = null;
+
+      if (
+        data &&
+        typeof data === "object" &&
+        (data as FeatureCollection<Geometry>).type === "FeatureCollection"
+      ) {
+        const features = (data as FeatureCollection<Geometry>).features ?? [];
+        collection = { type: "FeatureCollection", features };
+      } else if (
+        data &&
+        typeof data === "object" &&
+        (data as Feature<Geometry>).type === "Feature"
+      ) {
+        collection = {
+          type: "FeatureCollection",
+          features: [data as Feature<Geometry>],
+        };
+      }
+
+      if (!collection) {
+        throw new Error("Not a valid GeoJSON Feature or FeatureCollection.");
+      }
+
+      setUploadedGeojson(collection);
+      setUploadedName(file.name);
+      setUploadError(null);
+    } catch (error) {
+      setUploadedGeojson(null);
+      setUploadedName(null);
+      setUploadError(
+        error instanceof Error ? error.message : "Failed to read GeoJSON."
+      );
+    }
+  };
+
+  const handleClearUpload = () => {
+    setUploadedGeojson(null);
+    setUploadedName(null);
+    setUploadError(null);
+  };
+
   return (
     <div className="min-h-screen">
       <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col px-6 py-8">
@@ -227,6 +288,29 @@ export default function App() {
             >
               {highlightData ? "Highlight On" : "Highlight Off"}
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".geojson,application/geo+json,application/json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <button
+              className="rounded-full border border-white/60 bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-moss transition hover:-translate-y-0.5"
+              onClick={handleUploadClick}
+              type="button"
+            >
+              Upload GeoJSON
+            </button>
+            {uploadedGeojson && (
+              <button
+                className="rounded-full border border-ink/10 bg-ink px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-sand transition hover:-translate-y-0.5 hover:bg-ink/90"
+                onClick={handleClearUpload}
+                type="button"
+              >
+                Clear Upload
+              </button>
+            )}
             <button
               className="rounded-full border border-ink/10 bg-ink px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-sand transition hover:-translate-y-0.5 hover:bg-ink/90"
               onClick={handleClearSelection}
@@ -259,6 +343,20 @@ export default function App() {
                   ))
                 )}
               </div>
+              {(uploadedName || uploadError) && (
+                <div className="mt-4 rounded-lg border border-ink/10 bg-white/80 p-3 text-xs text-ink/70">
+                  {uploadedName && (
+                    <div className="text-[11px] uppercase tracking-[0.2em] text-moss">
+                      Uploaded: {uploadedName}
+                    </div>
+                  )}
+                  {uploadError && (
+                    <div className="mt-1 text-[11px] text-clay">
+                      {uploadError}
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
 
             <section className="rounded-2xl border border-white/70 bg-white/75 p-5 shadow-glow backdrop-blur">
@@ -296,6 +394,7 @@ export default function App() {
                 selectedMeshIds={selectedMeshIds}
                 onSelectionChange={setSelectedMeshIds}
                 highlightData={highlightData}
+                uploadedGeojson={uploadedGeojson}
               />
             </section>
 

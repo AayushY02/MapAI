@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type MapLayerMouseEvent } from "maplibre-gl";
-import type { FeatureCollection, Polygon } from "geojson";
+import type { FeatureCollection, Geometry, Polygon } from "geojson";
 import { fetchMeshPresence } from "../lib/api";
 
 const JAPAN_BOUNDS: [number, number, number, number] = [
@@ -14,9 +14,14 @@ const MESH_LON_STEP = 11.25 / 3600;
 const GRID_MIN_ZOOM = 10.8;
 const MAX_FEATURES = 8000;
 const SOURCE_ID = "mesh-grid";
+const UPLOAD_SOURCE_ID = "uploaded-geojson";
 const MAP_STYLE =
   import.meta.env.MAP_STYLE ?? "https://demotiles.maplibre.org/style.json";
 const EMPTY_COLLECTION: FeatureCollection<Polygon> = {
+  type: "FeatureCollection",
+  features: [],
+};
+const EMPTY_UPLOAD_COLLECTION: FeatureCollection<Geometry> = {
   type: "FeatureCollection",
   features: [],
 };
@@ -25,6 +30,7 @@ type MapViewProps = {
   selectedMeshIds: string[];
   onSelectionChange: (meshIds: string[]) => void;
   highlightData: boolean;
+  uploadedGeojson: FeatureCollection<Geometry> | null;
 };
 
 function meshCode250(lat: number, lon: number): string {
@@ -133,6 +139,7 @@ export default function MapView({
   selectedMeshIds,
   onSelectionChange,
   highlightData,
+  uploadedGeojson,
 }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -141,6 +148,7 @@ export default function MapView({
   const hoveredIdRef = useRef<string | null>(null);
   const highlightedRef = useRef<Set<string>>(new Set());
   const highlightEnabledRef = useRef(false);
+  const uploadedGeojsonRef = useRef<FeatureCollection<Geometry> | null>(null);
   const presenceRequestRef = useRef(0);
   const lastGridMeshIdsRef = useRef<string[]>([]);
   const presenceFetcherRef = useRef<(meshIds: string[]) => void>(() => {});
@@ -174,6 +182,19 @@ export default function MapView({
 
     presenceFetcherRef.current(lastGridMeshIdsRef.current);
   }, [highlightData]);
+
+  useEffect(() => {
+    uploadedGeojsonRef.current = uploadedGeojson;
+    const map = mapRef.current;
+    if (!map || !mapLoadedRef.current) {
+      return;
+    }
+    const source = map.getSource(UPLOAD_SOURCE_ID) as GeoJSONSource | undefined;
+    if (!source) {
+      return;
+    }
+    source.setData(uploadedGeojson ?? EMPTY_UPLOAD_COLLECTION);
+  }, [uploadedGeojson]);
 
   useEffect(() => {
     if (!mapContainerRef.current) {
@@ -241,6 +262,67 @@ export default function MapView({
           "line-width": 1,
         },
       });
+
+      map.addSource(UPLOAD_SOURCE_ID, {
+        type: "geojson",
+        data: uploadedGeojsonRef.current ?? EMPTY_UPLOAD_COLLECTION,
+      });
+
+      map.addLayer(
+        {
+          id: "upload-polygons",
+          type: "fill",
+          source: UPLOAD_SOURCE_ID,
+          filter: [
+            "any",
+            ["==", ["geometry-type"], "Polygon"],
+            ["==", ["geometry-type"], "MultiPolygon"],
+          ],
+          paint: {
+            "fill-color": "rgba(216, 158, 56, 0.35)",
+            "fill-outline-color": "rgba(216, 158, 56, 0.7)",
+          },
+        },
+        "mesh-fill"
+      );
+
+      map.addLayer(
+        {
+          id: "upload-lines",
+          type: "line",
+          source: UPLOAD_SOURCE_ID,
+          filter: [
+            "any",
+            ["==", ["geometry-type"], "LineString"],
+            ["==", ["geometry-type"], "MultiLineString"],
+          ],
+          paint: {
+            "line-color": "rgba(64, 142, 176, 0.9)",
+            "line-width": 2,
+          },
+        },
+        "mesh-fill"
+      );
+
+      map.addLayer(
+        {
+          id: "upload-points",
+          type: "circle",
+          source: UPLOAD_SOURCE_ID,
+          filter: [
+            "any",
+            ["==", ["geometry-type"], "Point"],
+            ["==", ["geometry-type"], "MultiPoint"],
+          ],
+          paint: {
+            "circle-color": "rgba(72, 168, 120, 0.9)",
+            "circle-radius": 5,
+            "circle-stroke-color": "#ffffff",
+            "circle-stroke-width": 1,
+          },
+        },
+        "mesh-fill"
+      );
 
       const requestPresence = async (meshIds: string[]) => {
         if (!highlightEnabledRef.current || meshIds.length === 0) {
