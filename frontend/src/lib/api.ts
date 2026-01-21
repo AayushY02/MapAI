@@ -17,7 +17,7 @@ export async function fetchMeshData(meshIds: string[]): Promise<MeshLookupRespon
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status})`);
+    throw new Error(`リクエストに失敗しました (${response.status})`);
   }
 
   return (await response.json()) as MeshLookupResponse;
@@ -33,7 +33,7 @@ export async function fetchMeshPresence(
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status})`);
+    throw new Error(`リクエストに失敗しました (${response.status})`);
   }
 
   return (await response.json()) as MeshPresenceResponse;

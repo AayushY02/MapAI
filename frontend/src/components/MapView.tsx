@@ -362,7 +362,7 @@ export default function MapView({
           });
           highlightedRef.current = next;
         } catch (error) {
-          console.error("Failed to fetch mesh presence", error);
+          console.error("メッシュ有無の取得に失敗しました", error);
         }
       };
 
@@ -542,30 +542,30 @@ export default function MapView({
     <div className="relative h-full w-full overflow-hidden rounded-2xl border border-white/60 bg-white/70 shadow-glow">
       <div ref={mapContainerRef} className="h-full w-full" />
       <div className="pointer-events-none absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-[10px] uppercase tracking-[0.28em] text-moss shadow-glow">
-        Japan 250m mesh - JIS X 0410
+        日本 250mメッシュ - JIS X 0410
       </div>
       <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/90 px-4 py-3 text-xs text-ink/70 shadow-glow">
         {gridStatus === "zoom" && (
           <div className="text-sm font-semibold text-ink">
-            Zoom in to see 250m mesh cells.
+            ズームインして250mメッシュを表示。
           </div>
         )}
         {gridStatus === "dense" && (
           <div className="text-sm font-semibold text-ink">
-            Zoom in further to load the mesh grid.
+            さらにズームインしてメッシュを表示。
           </div>
         )}
         {gridStatus === "ready" && (
           <>
             {hoveredMeshId ? (
               <div className="text-sm font-semibold text-ink">
-                Hovering {hoveredMeshId}
+                {hoveredMeshId} をホバー中
               </div>
             ) : (
-              <div>Hover a cell to inspect its mesh id.</div>
+              <div>セルにカーソルを合わせてメッシュIDを確認。</div>
             )}
             <div className="mt-1 text-[11px] text-ink/60">
-              Click cells to select and query backend data.
+              セルをクリックして選択し、バックエンドを検索。
             </div>
           </>
         )}

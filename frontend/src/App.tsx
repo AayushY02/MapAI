@@ -15,7 +15,7 @@ type FetchState = {
 const schemaTiles = [
   {
     title: "mesh_index",
-    detail: "Primary table for every mesh_id",
+    detail: "全メッシュIDの主テーブル",
     columns: [
       "mesh_id",
       "has_points",
@@ -26,22 +26,22 @@ const schemaTiles = [
   },
   {
     title: "point_features",
-    detail: "All point layers in one table",
+    detail: "全ポイントレイヤーを1テーブルに集約",
     columns: ["source_layer", "mesh_id", "geometry", "properties"],
   },
   {
     title: "line_features",
-    detail: "All line layers in one table",
+    detail: "全ラインレイヤーを1テーブルに集約",
     columns: ["source_layer", "mesh_id", "geometry", "properties"],
   },
   {
     title: "polygon_features",
-    detail: "All polygon layers in one table",
+    detail: "全ポリゴンレイヤーを1テーブルに集約",
     columns: ["source_layer", "mesh_id", "geometry", "properties"],
   },
   {
     title: "line_mesh_map",
-    detail: "Clipped lines per mesh (all layers)",
+    detail: "メッシュごとの切り出しライン（全レイヤー）",
     columns: [
       "source_layer",
       "mesh_id",
@@ -53,7 +53,7 @@ const schemaTiles = [
   },
   {
     title: "polygon_mesh_map",
-    detail: "Clipped polygons per mesh (all layers)",
+    detail: "メッシュごとの切り出しポリゴン（全レイヤー）",
     columns: [
       "source_layer",
       "mesh_id",
@@ -65,12 +65,12 @@ const schemaTiles = [
   },
   {
     title: "layer_registry",
-    detail: "Registry for per-file layer tables",
+    detail: "ファイル別レイヤーテーブルのレジストリ",
     columns: ["layer_name", "table_name", "geometry_type", "mesh_map_table"],
   },
   {
-    title: "dynamic layer tables",
-    detail: "One table per GeoJSON file (plus *_mesh_map for lines/polygons)",
+    title: "動的レイヤーテーブル",
+    detail: "GeoJSONファイルごとに1テーブル（ライン/ポリゴンは*_mesh_map付き）",
     columns: ["mesh_id", "geometry", "properties"],
   },
 ];
@@ -147,10 +147,10 @@ export default function App() {
           setMeshData(data);
         }
       })
-      .catch((error: Error) => {
+      .catch(() => {
         if (active) {
           setMeshData(null);
-          setFetchState({ loading: false, error: error.message });
+          setFetchState({ loading: false, error: "データ取得に失敗しました。" });
         }
       })
       .finally(() => {
@@ -225,7 +225,7 @@ export default function App() {
       }
 
       if (!collection) {
-        throw new Error("Not a valid GeoJSON Feature or FeatureCollection.");
+        throw new Error("GeoJSONのFeatureまたはFeatureCollectionではありません。");
       }
 
       setUploadedGeojson(collection);
@@ -234,9 +234,7 @@ export default function App() {
     } catch (error) {
       setUploadedGeojson(null);
       setUploadedName(null);
-      setUploadError(
-        error instanceof Error ? error.message : "Failed to read GeoJSON."
-      );
+      setUploadError("GeoJSONの読み込みに失敗しました。");
     }
   };
 
@@ -318,19 +316,19 @@ export default function App() {
         <header className="flex flex-col gap-6 border-b border-white/60 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.32em] text-moss">
-              Mesh Intelligence
+              メッシュインテリジェンス
             </div>
             <h1 className="mt-3 font-display text-4xl text-ink lg:text-5xl">
-              Mesh Explorer Mockup
+              メッシュ探索モック
             </h1>
             <p className="mt-3 max-w-xl text-sm text-ink/70">
-              Select 250m mesh blocks on the MapLibre grid to fetch the backend
-              layer data tied to those mesh ids.
+              MapLibreのグリッドで250mメッシュを選択すると、該当メッシュIDに
+              紐づくバックエンドのレイヤーデータを取得します。
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="rounded-full border border-white/60 bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.22em] text-moss">
-              Selected {selectedMeshIds.length}
+              選択 {selectedMeshIds.length}
             </div>
             <button
               className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] transition ${
@@ -342,7 +340,7 @@ export default function App() {
               type="button"
               aria-pressed={highlightData}
             >
-              {highlightData ? "Highlight On" : "Highlight Off"}
+              {highlightData ? "データ強調: オン" : "データ強調: オフ"}
             </button>
             <input
               ref={fileInputRef}
@@ -356,7 +354,7 @@ export default function App() {
               onClick={handleUploadClick}
               type="button"
             >
-              Upload GeoJSON
+              GeoJSONをアップロード
             </button>
             {uploadedGeojson && (
               <button
@@ -364,7 +362,7 @@ export default function App() {
                 onClick={handleClearUpload}
                 type="button"
               >
-                Clear Upload
+                アップロードをクリア
               </button>
             )}
             <button
@@ -372,7 +370,7 @@ export default function App() {
               onClick={handleClearSelection}
               type="button"
             >
-              Clear
+              クリア
             </button>
           </div>
         </header>
@@ -381,12 +379,12 @@ export default function App() {
           <aside className="space-y-6">
             <section className="rounded-2xl border border-white/70 bg-white/75 p-5 shadow-glow backdrop-blur">
               <div className="text-xs font-semibold uppercase tracking-[0.3em] text-ink/50">
-                Selected Mesh IDs
+                選択中のメッシュID
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {orderedMeshIds.length === 0 ? (
                   <div className="text-sm text-ink/50">
-                    Click grid cells to start a query.
+                    グリッドセルをクリックして検索を開始。
                   </div>
                 ) : (
                   orderedMeshIds.map((meshId) => (
@@ -403,7 +401,7 @@ export default function App() {
                 <div className="mt-4 rounded-lg border border-ink/10 bg-white/80 p-3 text-xs text-ink/70">
                   {uploadedName && (
                     <div className="text-[11px] uppercase tracking-[0.2em] text-moss">
-                      Uploaded: {uploadedName}
+                      アップロード: {uploadedName}
                     </div>
                   )}
                   {uploadError && (
@@ -417,7 +415,7 @@ export default function App() {
 
             <section className="rounded-2xl border border-white/70 bg-white/75 p-5 shadow-glow backdrop-blur">
               <div className="text-xs font-semibold uppercase tracking-[0.3em] text-ink/50">
-                Backend Schema
+                バックエンドスキーマ
               </div>
               <div className="mt-4 space-y-4 text-xs text-ink/70">
                 {schemaTiles.map((tile) => (
@@ -457,10 +455,10 @@ export default function App() {
             <section className="rounded-2xl border border-white/70 bg-white/75 p-5 shadow-glow backdrop-blur">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.3em] text-ink/50">
-                  Data Returned
+                  取得データ
                 </div>
                 {fetchState.loading && (
-                  <div className="text-xs text-moss">Loading mesh data...</div>
+                  <div className="text-xs text-moss">メッシュデータを読み込み中...</div>
                 )}
                 {fetchState.error && (
                   <div className="text-xs text-clay">
@@ -471,14 +469,14 @@ export default function App() {
               <div className="mt-4 space-y-4">
                 {!meshData || meshData.meshes.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-ink/20 bg-white/80 p-4 text-sm text-ink/60">
-                    No data yet. Select mesh ids to view backend results.
+                    まだデータがありません。メッシュIDを選択して結果を表示します。
                   </div>
                 ) : (
                   <>
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div className="rounded-xl border border-ink/10 bg-sand/80 p-4">
                         <div className="text-[11px] uppercase tracking-[0.2em] text-ink/50">
-                          Selected Meshes
+                          選択メッシュ数
                         </div>
                         <div className="mt-2 text-2xl font-semibold text-ink">
                           {meshSummaries.length}
@@ -486,7 +484,7 @@ export default function App() {
                       </div>
                       <div className="rounded-xl border border-ink/10 bg-sand/80 p-4">
                         <div className="text-[11px] uppercase tracking-[0.2em] text-ink/50">
-                          Meshes With Data
+                          データありメッシュ数
                         </div>
                         <div className="mt-2 text-2xl font-semibold text-ink">
                           {meshesWithData}
@@ -494,7 +492,7 @@ export default function App() {
                       </div>
                       <div className="rounded-xl border border-ink/10 bg-sand/80 p-4">
                         <div className="text-[11px] uppercase tracking-[0.2em] text-ink/50">
-                          Features Loaded
+                          取得フィーチャ数
                         </div>
                         <div className="mt-2 text-2xl font-semibold text-ink">
                           {totalFeatures}
@@ -505,7 +503,7 @@ export default function App() {
                     <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
                       <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
                         <div className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/50">
-                          Meshes
+                          メッシュ一覧
                         </div>
                         <div className="mt-3 max-h-[420px] space-y-2 overflow-auto pr-1">
                           {meshSummaries.map((mesh) => (
@@ -522,18 +520,18 @@ export default function App() {
                               <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em]">
                                 <span>{mesh.meshId}</span>
                                 <span className="text-ink/40">
-                                  {mesh.totalFeatures} items
+                                  {mesh.totalFeatures} 件
                                 </span>
                               </div>
                               <div className="mt-2 flex flex-wrap gap-2">
                                 <span className="rounded-full bg-ink/5 px-2 py-1 text-[10px] text-ink/60">
-                                  Points {mesh.layers.filter((layer) => layer.type === "point").reduce((sum, layer) => sum + layer.features.length, 0)}
+                                  ポイント {mesh.layers.filter((layer) => layer.type === "point").reduce((sum, layer) => sum + layer.features.length, 0)}
                                 </span>
                                 <span className="rounded-full bg-ink/5 px-2 py-1 text-[10px] text-ink/60">
-                                  Lines {mesh.layers.filter((layer) => layer.type === "line").reduce((sum, layer) => sum + layer.features.length, 0)}
+                                  ライン {mesh.layers.filter((layer) => layer.type === "line").reduce((sum, layer) => sum + layer.features.length, 0)}
                                 </span>
                                 <span className="rounded-full bg-ink/5 px-2 py-1 text-[10px] text-ink/60">
-                                  Polygons {mesh.layers.filter((layer) => layer.type === "polygon").reduce((sum, layer) => sum + layer.features.length, 0)}
+                                  ポリゴン {mesh.layers.filter((layer) => layer.type === "polygon").reduce((sum, layer) => sum + layer.features.length, 0)}
                                 </span>
                               </div>
                             </button>
@@ -545,25 +543,25 @@ export default function App() {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
                             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/50">
-                              Inspector
+                              インスペクター
                             </div>
                             <div className="mt-2 text-lg font-semibold text-ink">
-                              {activeMesh?.meshId ?? "Select a mesh"}
+                              {activeMesh?.meshId ?? "メッシュを選択"}
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <LayerBadge
-                              label="Points"
+                              label="ポイント"
                               count={activeMesh?.layers.filter((layer) => layer.type === "point").reduce((sum, layer) => sum + layer.features.length, 0) ?? 0}
                               active={Boolean(activeMesh?.presence.points)}
                             />
                             <LayerBadge
-                              label="Lines"
+                              label="ライン"
                               count={activeMesh?.layers.filter((layer) => layer.type === "line").reduce((sum, layer) => sum + layer.features.length, 0) ?? 0}
                               active={Boolean(activeMesh?.presence.lines)}
                             />
                             <LayerBadge
-                              label="Polygons"
+                              label="ポリゴン"
                               count={activeMesh?.layers.filter((layer) => layer.type === "polygon").reduce((sum, layer) => sum + layer.features.length, 0) ?? 0}
                               active={Boolean(activeMesh?.presence.polygons)}
                             />
@@ -580,7 +578,7 @@ export default function App() {
                                 : "bg-ink/5 text-ink/60 hover:-translate-y-0.5"
                             }`}
                           >
-                            All layers
+                            全レイヤー
                           </button>
                           {activeLayerIds.map((layerId) => {
                             const layer = activeLayerMap.get(layerId);
@@ -607,7 +605,7 @@ export default function App() {
                         <div className="mt-4 space-y-3">
                           {activeFeatures.length === 0 ? (
                             <div className="rounded-lg border border-dashed border-ink/15 bg-white/70 p-4 text-[11px] text-ink/50">
-                              No features for this mesh/layer.
+                              このメッシュ/レイヤーにはデータがありません。
                             </div>
                           ) : (
                             pageItems.map((feature) => (
@@ -635,7 +633,7 @@ export default function App() {
                         {activeFeatures.length > 0 && (
                           <div className="mt-4 flex items-center justify-between text-xs text-ink/60">
                             <span>
-                              Page {currentPage} of {totalPages}
+                              ページ {currentPage} / {totalPages}
                             </span>
                             <div className="flex gap-2">
                               <button
@@ -646,7 +644,7 @@ export default function App() {
                                 disabled={currentPage === 1}
                                 className="rounded-full border border-ink/10 bg-white/80 px-3 py-1 text-[11px] text-ink/60 transition disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                Prev
+                                前へ
                               </button>
                               <button
                                 type="button"
@@ -656,7 +654,7 @@ export default function App() {
                                 disabled={currentPage === totalPages}
                                 className="rounded-full border border-ink/10 bg-white/80 px-3 py-1 text-[11px] text-ink/60 transition disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                Next
+                                次へ
                               </button>
                             </div>
                           </div>
