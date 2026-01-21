@@ -511,6 +511,10 @@ export default function MapView({
   }, [onSelectionChange]);
 
   useEffect(() => {
+    const next = new Set(selectedMeshIds);
+    const current = selectedRef.current;
+    selectedRef.current = next;
+
     const map = mapRef.current;
     if (!map || !mapLoadedRef.current) {
       return;
@@ -520,9 +524,11 @@ export default function MapView({
       return;
     }
 
-    const next = new Set(selectedMeshIds);
-    const current = selectedRef.current;
-    const allIds = new Set([...current, ...next]);
+    const allIds = new Set([
+      ...current,
+      ...next,
+      ...lastGridMeshIdsRef.current,
+    ]);
 
     allIds.forEach((meshId) => {
       map.setFeatureState(
@@ -530,8 +536,6 @@ export default function MapView({
         { selected: next.has(meshId) }
       );
     });
-
-    selectedRef.current = next;
   }, [selectedMeshIds]);
 
   return (
